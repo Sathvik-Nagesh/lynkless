@@ -696,11 +696,92 @@
             }
 
             startRequestChecking() {
-                // Check for incoming requests and offers every 2 seconds
+                // Check for incoming requests, offers, connections, and files every 2 seconds
                 setInterval(() => {
                     this.showConnectionRequests();
                     this.checkForIncomingOffers();
+                    this.checkForIncomingConnections();
+                    this.checkForIncomingFiles();
                 }, 2000);
+            }
+
+            checkForIncomingConnections() {
+                // Check if someone has connected to us
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith(`lynkless_connection_${this.myPeerId}_from_`)) {
+                        try {
+                            const connectionData = JSON.parse(localStorage.getItem(key));
+                            if (Date.now() - connectionData.timestamp < 120000) { // 2 minutes
+                                // Someone connected to us, connect back automatically
+                                if (!this.peers.has(connectionData.fromPeer)) {
+                                    this.autoConnectToPeer(connectionData.fromPeer);
+                                    localStorage.removeItem(key);
+                                }
+                            } else {
+                                localStorage.removeItem(key);
+                            }
+                        } catch (error) {
+                            localStorage.removeItem(key);
+                        }
+                    }
+                }
+            }
+
+            autoConnectToPeer(peerId) {
+                // Automatically connect back to someone who connected to us
+                this.addPeer({
+                    id: peerId,
+                    name: peerId.split('-')[1] ? peerId.split('-')[1].toUpperCase() : 'Friend',
+                    avatar: '👤',
+                    connectionStatus: 'connected'
+                });
+                
+                this.showStatus(`${peerId} connected to you! Connection established.`, 'success');
+                this.updateChatStatus();
+                this.updateShareButton();
+            }
+
+            checkForIncomingFiles() {
+                // Check for incoming files from connected peers
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith(`lynkless_file_${this.myPeerId}_from_`)) {
+                        try {
+                            const fileData = JSON.parse(localStorage.getItem(key));
+                            if (Date.now() - fileData.timestamp < 300000) { // 5 minutes
+                                this.receiveFile(fileData);
+                                localStorage.removeItem(key);
+                            } else {
+                                localStorage.removeItem(key);
+                            }
+                        } catch (error) {
+                            localStorage.removeItem(key);
+                        }
+                    }
+                }
+            }
+
+            receiveFile(fileData) {
+                try {
+                    // Convert base64 back to file
+                    this.showStatus(`📥 Receiving ${fileData.fileName} from ${fileData.fromPeer}...`, 'info');
+                    
+                    // Create download link
+                    const link = document.createElement('a');
+                    link.href = fileData.fileData;
+                    link.download = fileData.fileName;
+                    link.style.display = 'none';
+                    
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    this.showStatus(`✅ Downloaded ${fileData.fileName} successfully!`, 'success');
+                    
+                } catch (error) {
+                    this.showStatus(`❌ Failed to receive file: ${error.message}`, 'error');
+                }
             }
 
             startPresenceBroadcasting() {
@@ -1381,19 +1462,50 @@
 
                 this.showStatus(`Sharing ${this.files.length} file(s) with ${this.peers.size} peer(s)...`, 'info');
 
-                // Simulate file sharing process
+                // Actually transfer files via localStorage (for same-origin demo)
                 for (let i = 0; i < this.files.length; i++) {
                     const file = this.files[i];
                     
-                    // Simulate file transfer progress
                     this.showStatus(`Sending ${file.name} (${i + 1}/${this.files.length})...`, 'info');
-                    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000));
                     
-                    // Simulate file received by peer (add to their file list in demo)
-                    this.showStatus(`✅ ${file.name} shared successfully!`, 'success');
+                    try {
+                        // Convert file to base64 for localStorage storage
+                        const fileData = await this.fileToBase64(file);
+                        
+                        // Store file for each connected peer
+                        this.peers.forEach((peer, peerId) => {
+                            const transferData = {
+                                fileName: file.name,
+                                fileSize: file.size,
+                                fileType: file.type,
+                                fileData: fileData,
+                                fromPeer: this.myPeerId,
+                                toPeer: peerId,
+                                timestamp: Date.now()
+                            };
+                            
+                            const transferKey = `lynkless_file_${peerId}_from_${this.myPeerId}_${Date.now()}`;
+                            localStorage.setItem(transferKey, JSON.stringify(transferData));
+                        });
+                        
+                        this.showStatus(`✅ ${file.name} shared successfully!`, 'success');
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                    } catch (error) {
+                        this.showStatus(`❌ Failed to share ${file.name}: ${error.message}`, 'error');
+                    }
                 }
 
                 this.showStatus(`🎉 All ${this.files.length} files shared successfully!`, 'success');
+            }
+
+            async fileToBase64(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = error => reject(error);
+                });
             }
 
             async sendFileToPeer(file) {
@@ -1491,14 +1603,31 @@
                 }
             }
 
-            // Simplified connection handling - simulate connection for demo
+            // Automated bidirectional connection
             async connectToPeerManually(peerId) {
                 try {
                     this.showStatus(`Connecting to ${peerId}...`, 'info');
                     
-                    // Simulate a successful connection for demo/testing purposes
+                    // Store connection request in localStorage for the other peer to see
+                    const connectionData = {
+                        fromPeer: this.myPeerId,
+                        toPeer: peerId,
+                        timestamp: Date.now(),
+                        type: 'connection_request'
+                    };
+                    
+                    localStorage.setItem(`lynkless_connection_${peerId}_from_${this.myPeerId}`, JSON.stringify(connectionData));
+                    
+                    // Also create a bidirectional connection marker
+                    localStorage.setItem(`lynkless_peers_${this.myPeerId}_${peerId}`, JSON.stringify({
+                        peer1: this.myPeerId,
+                        peer2: peerId,
+                        timestamp: Date.now(),
+                        status: 'connected'
+                    }));
+                    
+                    // Add peer as connected locally
                     setTimeout(() => {
-                        // Add peer as connected
                         this.addPeer({
                             id: peerId,
                             name: peerId.split('-')[1] ? peerId.split('-')[1].toUpperCase() : 'Friend',
@@ -1512,7 +1641,7 @@
                         this.updateChatStatus();
                         this.updateShareButton();
                         
-                    }, 1500); // Simulate connection delay
+                    }, 1000);
                     
                 } catch (error) {
                     this.showStatus('Connection failed: ' + error.message, 'error');
