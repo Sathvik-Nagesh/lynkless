@@ -706,44 +706,101 @@
             }
 
             checkForIncomingConnections() {
-                // Check if someone has connected to us
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    if (key && key.startsWith(`lynkless_connection_${this.myPeerId}_from_`)) {
-                        try {
-                            const connectionData = JSON.parse(localStorage.getItem(key));
-                            if (Date.now() - connectionData.timestamp < 120000) { // 2 minutes
-                                // Someone connected to us, connect back automatically
-                                if (!this.peers.has(connectionData.fromPeer)) {
-                                    this.autoConnectToPeer(connectionData.fromPeer);
-                                    localStorage.removeItem(key);
-                                }
-                            } else {
-                                localStorage.removeItem(key);
-                            }
-                        } catch (error) {
-                            localStorage.removeItem(key);
+                // Check for URL-based connection requests (cross-device)
+                const urlParams = new URLSearchParams(window.location.search);
+                const connectData = urlParams.get('connect');
+                
+                if (connectData && !this.processedUrlRequest) {
+                    try {
+                        const requestData = JSON.parse(atob(connectData));
+                        if (requestData.toPeer === this.myPeerId) {
+                            // This is a connection request for us
+                            this.showIncomingConnectionRequest(requestData);
+                            this.processedUrlRequest = true;
+                            
+                            // Clean URL
+                            const newUrl = window.location.origin + window.location.pathname;
+                            window.history.replaceState({}, document.title, newUrl);
                         }
+                    } catch (error) {
+                        console.error('Error processing URL connection request:', error);
                     }
                 }
             }
 
-            autoConnectToPeer(peerId) {
-                // Automatically connect back to someone who connected to us
-                this.addPeer({
-                    id: peerId,
-                    name: peerId.split('-')[1] ? peerId.split('-')[1].toUpperCase() : 'Friend',
-                    avatar: '👤',
-                    connectionStatus: 'connected'
-                });
+            showIncomingConnectionRequest(requestData) {
+                // Show incoming connection request with accept/deny options
+                const requestsContainer = document.getElementById('connectionRequests');
+                if (!requestsContainer) return;
                 
-                this.showStatus(`${peerId} connected to you! Connection established.`, 'success');
-                this.updateChatStatus();
-                this.updateShareButton();
+                const requestElement = document.createElement('div');
+                requestElement.className = 'connection-request';
+                requestElement.innerHTML = `
+                    <div class="request-info">
+                        <span class="request-from">📥 ${requestData.fromName} (${requestData.fromPeer}) wants to connect</span>
+                        <span class="request-time">${new Date(requestData.timestamp).toLocaleTimeString()}</span>
+                    </div>
+                    <div class="request-actions">
+                        <button class="btn accept-btn" onclick="lynklessApp.respondToUrlRequest('${requestData.fromPeer}', '${requestData.fromName}', true)">Accept</button>
+                        <button class="btn deny-btn" onclick="lynklessApp.respondToUrlRequest('${requestData.fromPeer}', '${requestData.fromName}', false)">Deny</button>
+                    </div>
+                `;
+                
+                requestsContainer.appendChild(requestElement);
+                this.showStatus(`${requestData.fromName} wants to connect! Check the Peers tab.`, 'info');
+                
+                // Switch to peers tab to show the request
+                this.switchToTab('peers');
+            }
+
+            respondToUrlRequest(fromPeerId, fromName, accepted) {
+                if (accepted) {
+                    // Accept connection
+                    this.addPeer({
+                        id: fromPeerId,
+                        name: fromName,
+                        avatar: '👤',
+                        connectionStatus: 'connected'
+                    });
+                    
+                    this.showStatus(`✅ Connected to ${fromName}! You can now share files and chat.`, 'success');
+                    this.updateChatStatus();
+                    this.updateShareButton();
+                } else {
+                    this.showStatus(`❌ Denied connection request from ${fromName}`, 'info');
+                }
+                
+                // Remove the request from UI
+                const requestElements = document.querySelectorAll('.connection-request');
+                requestElements.forEach(el => {
+                    if (el.textContent.includes(fromPeerId)) {
+                        el.remove();
+                    }
+                });
             }
 
             checkForIncomingFiles() {
-                // Check for incoming files from connected peers
+                // Check for URL-based file transfers (cross-device)
+                const urlParams = new URLSearchParams(window.location.search);
+                const fileData = urlParams.get('file');
+                
+                if (fileData && !this.processedFileUrl) {
+                    try {
+                        const transferData = JSON.parse(atob(fileData));
+                        if (transferData.type === 'file_transfer') {
+                            this.receiveFile(transferData);
+                            this.processedFileUrl = true;
+                            
+                            // Clean URL
+                            const newUrl = window.location.origin + window.location.pathname;
+                            window.history.replaceState({}, document.title, newUrl);
+                        }
+                    } catch (error) {
+                        console.error('Error processing URL file transfer:', error);
+                    }
+                }
+                
+                // Also check localStorage for same-device transfers
                 for (let i = 0; i < localStorage.length; i++) {
                     const key = localStorage.key(i);
                     if (key && key.startsWith(`lynkless_file_${this.myPeerId}_from_`)) {
@@ -1462,14 +1519,14 @@
 
                 this.showStatus(`Sharing ${this.files.length} file(s) with ${this.peers.size} peer(s)...`, 'info');
 
-                // Actually transfer files via localStorage (for same-origin demo)
+                // Share files via both localStorage (same-device) and URL generation (cross-device)
                 for (let i = 0; i < this.files.length; i++) {
                     const file = this.files[i];
                     
                     this.showStatus(`Sending ${file.name} (${i + 1}/${this.files.length})...`, 'info');
                     
                     try {
-                        // Convert file to base64 for localStorage storage
+                        // Convert file to base64 for transfer
                         const fileData = await this.fileToBase64(file);
                         
                         // Store file for each connected peer
@@ -1481,11 +1538,17 @@
                                 fileData: fileData,
                                 fromPeer: this.myPeerId,
                                 toPeer: peerId,
-                                timestamp: Date.now()
+                                timestamp: Date.now(),
+                                type: 'file_transfer'
                             };
                             
+                            // Store locally for same-device demo
                             const transferKey = `lynkless_file_${peerId}_from_${this.myPeerId}_${Date.now()}`;
                             localStorage.setItem(transferKey, JSON.stringify(transferData));
+                            
+                            // Generate shareable URL for cross-device
+                            const shareUrl = this.generateFileShareUrl(transferData);
+                            this.showFileShareUrl(file.name, shareUrl);
                         });
                         
                         this.showStatus(`✅ ${file.name} shared successfully!`, 'success');
@@ -1496,7 +1559,34 @@
                     }
                 }
 
-                this.showStatus(`🎉 All ${this.files.length} files shared successfully!`, 'success');
+                this.showStatus(`🎉 All ${this.files.length} files shared successfully! Share URLs are displayed below.`, 'success');
+            }
+
+            generateFileShareUrl(transferData) {
+                // Generate URL with file data for cross-device sharing
+                const baseUrl = window.location.origin + window.location.pathname;
+                const encodedData = btoa(JSON.stringify(transferData));
+                return `${baseUrl}?file=${encodedData}`;
+            }
+
+            showFileShareUrl(fileName, url) {
+                // Display file share URL prominently
+                const statusElement = document.querySelector('.status-message');
+                if (statusElement) {
+                    const existingContent = statusElement.innerHTML;
+                    statusElement.innerHTML = existingContent + `
+                        <div style="background: #2a2a2a; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                            <h4 style="color: #4CAF50; margin: 0 0 10px 0;">📁 Share URL for "${fileName}":</h4>
+                            <div style="background: #1a1a1a; padding: 10px; border-radius: 4px; font-family: monospace; word-break: break-all; color: #ffff00; font-size: 12px;">
+                                ${url}
+                            </div>
+                            <button onclick="navigator.clipboard.writeText('${url}'); this.textContent='✅ Copied!'" 
+                                    style="margin-top: 10px; padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                📋 Copy URL
+                            </button>
+                        </div>
+                    `;
+                }
             }
 
             async fileToBase64(file) {
@@ -1603,48 +1693,63 @@
                 }
             }
 
-            // Automated bidirectional connection
+            // Send connection request (with accept/deny flow)
             async connectToPeerManually(peerId) {
                 try {
-                    this.showStatus(`Connecting to ${peerId}...`, 'info');
+                    this.showStatus(`Sending connection request to ${peerId}...`, 'info');
                     
-                    // Store connection request in localStorage for the other peer to see
-                    const connectionData = {
+                    // Create connection request
+                    const requestData = {
                         fromPeer: this.myPeerId,
+                        fromName: this.myPeerId.split('-')[1] ? this.myPeerId.split('-')[1].toUpperCase() : 'Friend',
                         toPeer: peerId,
                         timestamp: Date.now(),
-                        type: 'connection_request'
+                        type: 'connection_request',
+                        status: 'pending'
                     };
                     
-                    localStorage.setItem(`lynkless_connection_${peerId}_from_${this.myPeerId}`, JSON.stringify(connectionData));
+                    // Store request for the other peer to see (localStorage for same-device demo, URL for cross-device)
+                    const requestKey = `lynkless_request_${peerId}_from_${this.myPeerId}_${Date.now()}`;
+                    localStorage.setItem(requestKey, JSON.stringify(requestData));
                     
-                    // Also create a bidirectional connection marker
-                    localStorage.setItem(`lynkless_peers_${this.myPeerId}_${peerId}`, JSON.stringify({
-                        peer1: this.myPeerId,
-                        peer2: peerId,
-                        timestamp: Date.now(),
-                        status: 'connected'
-                    }));
+                    // Also generate a shareable URL for cross-device connections
+                    const shareableUrl = this.generateShareableUrl(requestData);
                     
-                    // Add peer as connected locally
-                    setTimeout(() => {
-                        this.addPeer({
-                            id: peerId,
-                            name: peerId.split('-')[1] ? peerId.split('-')[1].toUpperCase() : 'Friend',
-                            avatar: '👤',
-                            connectionStatus: 'connected'
-                        });
-                        
-                        this.showStatus(`Successfully connected to ${peerId}! You can now share files and chat.`, 'success');
-                        
-                        // Enable chat and file sharing
-                        this.updateChatStatus();
-                        this.updateShareButton();
-                        
-                    }, 1000);
+                    // Show the URL in the status and copy to clipboard
+                    this.showConnectionUrl(shareableUrl);
+                    this.showStatus(`✅ Connection request sent! Check the status message below for the share URL.`, 'success');
+                    
+                    // Add to radar for easy access
+                    this.addManualPeerToRadar(peerId);
                     
                 } catch (error) {
                     this.showStatus('Connection failed: ' + error.message, 'error');
+                }
+            }
+
+            generateShareableUrl(requestData) {
+                // Generate URL with connection request data for cross-device sharing
+                const baseUrl = window.location.origin + window.location.pathname;
+                const encodedData = btoa(JSON.stringify(requestData));
+                return `${baseUrl}?connect=${encodedData}`;
+            }
+
+            showConnectionUrl(url) {
+                // Display the connection URL prominently and copy to clipboard
+                const statusElement = document.querySelector('.status-message');
+                if (statusElement) {
+                    statusElement.innerHTML = `
+                        <div style="background: #2a2a2a; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                            <h4 style="color: #4CAF50; margin: 0 0 10px 0;">🔗 Share this URL with your friend:</h4>
+                            <div style="background: #1a1a1a; padding: 10px; border-radius: 4px; font-family: monospace; word-break: break-all; color: #ffff00;">
+                                ${url}
+                            </div>
+                            <button onclick="navigator.clipboard.writeText('${url}'); this.textContent='✅ Copied!'" 
+                                    style="margin-top: 10px; padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                📋 Copy URL
+                            </button>
+                        </div>
+                    `;
                 }
             }
 
