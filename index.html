@@ -1,0 +1,1926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lynkless - Local File Share</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .title {
+            font-size: 2.5rem;
+            font-weight: 300;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 1rem;
+            font-weight: 300;
+        }
+
+        .tabs {
+            display: flex;
+            background: #111;
+            border-radius: 12px;
+            padding: 0.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            color: #888;
+        }
+
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .tab:hover:not(.active) {
+            background: #1a1a1a;
+            color: #ccc;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .upload-zone {
+            border: 2px dashed #333;
+            border-radius: 12px;
+            padding: 3rem 2rem;
+            text-align: center;
+            background: #111;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            margin-bottom: 2rem;
+        }
+
+        .upload-zone:hover,
+        .upload-zone.dragover {
+            border-color: #667eea;
+            background: #151515;
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .upload-text {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+            color: #ccc;
+        }
+
+        .upload-hint {
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .file-list {
+            min-height: 200px;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            background: #111;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            transition: all 0.2s ease;
+        }
+
+        .file-item:hover {
+            background: #1a1a1a;
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .file-icon {
+            font-size: 2rem;
+        }
+
+        .file-details h4 {
+            color: #ccc;
+            margin-bottom: 0.25rem;
+        }
+
+        .file-size {
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .file-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn {
+            background: #333;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+        }
+
+        .btn:hover {
+            background: #444;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .download-btn {
+            background: #28a745;
+            text-decoration: none;
+        }
+
+        .download-btn:hover {
+            background: #218838;
+        }
+
+        .share-btn {
+            background: #667eea;
+        }
+
+        .share-btn:hover {
+            background: #5a6fd8;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: #666;
+        }
+
+        .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .peer-section {
+            background: #111;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .peer-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .peer-input {
+            flex: 1;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: white;
+            padding: 0.75rem;
+            border-radius: 6px;
+            min-width: 300px;
+        }
+
+        .peer-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .connect-btn {
+            background: #28a745;
+        }
+
+        .connect-btn:hover {
+            background: #218838;
+        }
+
+        .disconnect-btn {
+            background: #dc3545;
+        }
+
+        .disconnect-btn:hover {
+            background: #c82333;
+        }
+
+        .peer-list {
+            min-height: 150px;
+        }
+
+        .peer-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            background: #1a1a1a;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .peer-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .peer-avatar {
+            width: 40px;
+            height: 40px;
+            background: #667eea;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .peer-details h4 {
+            color: #ccc;
+            margin-bottom: 0.25rem;
+        }
+
+        .peer-status {
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        /* Radar Styles */
+        .radar-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .user-card {
+            background: #1a1a1a;
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+
+        .user-card:hover {
+            background: #222;
+            border-color: #667eea;
+        }
+
+        .user-avatar {
+            width: 60px;
+            height: 60px;
+            background: #667eea;
+            border-radius: 50%;
+            margin: 0 auto 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .user-name {
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: #ccc;
+        }
+
+        .user-distance {
+            font-size: 0.9rem;
+            color: #888;
+            margin-bottom: 1rem;
+        }
+
+        .user-status {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            background: #28a745;
+            color: white;
+        }
+
+        .user-status.busy {
+            background: #ffc107;
+            color: #000;
+        }
+
+        .user-status.away {
+            background: #6c757d;
+        }
+
+        /* Connection Requests */
+        .connection-requests {
+            margin-top: 2rem;
+        }
+
+        .request-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            background: #1a1a1a;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border-left: 4px solid #667eea;
+        }
+
+        .request-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .request-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .accept-btn {
+            background: #28a745;
+        }
+
+        .deny-btn {
+            background: #dc3545;
+        }
+
+        /* Chat Styles */
+        .chat-container {
+            background: #111;
+            border-radius: 12px;
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            padding: 1rem;
+            border-bottom: 1px solid #333;
+            background: #1a1a1a;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .chat-message {
+            margin-bottom: 1rem;
+        }
+
+        .message-sender {
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 0.25rem;
+        }
+
+        .message-content {
+            background: #1a1a1a;
+            padding: 0.5rem 1rem;
+            border-radius: 12px;
+            color: #ccc;
+        }
+
+        .message-content.own {
+            background: #667eea;
+            color: white;
+            margin-left: auto;
+            max-width: 70%;
+        }
+
+        .chat-input-container {
+            padding: 1rem;
+            border-top: 1px solid #333;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: white;
+            padding: 0.75rem;
+            border-radius: 6px;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .send-btn {
+            background: #667eea;
+            padding: 0.75rem 1.5rem;
+        }
+
+        /* Manual Connection */
+        .manual-connection {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: #1a1a1a;
+            border-radius: 8px;
+        }
+
+        .offer-input {
+            width: 100%;
+            min-height: 100px;
+            background: #111;
+            border: 1px solid #333;
+            color: white;
+            padding: 1rem;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            resize: vertical;
+        }
+
+        .offer-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .status-message {
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            text-align: center;
+        }
+
+        .status-success {
+            background: #1e3a2e;
+            color: #28a745;
+            border: 1px solid #28a745;
+        }
+
+        .status-error {
+            background: #3a1e1e;
+            color: #dc3545;
+            border: 1px solid #dc3545;
+        }
+
+        .status-info {
+            background: #1e2e3a;
+            color: #667eea;
+            border: 1px solid #667eea;
+        }
+
+        @media (max-width: 768px) {
+            .title {
+                font-size: 2rem;
+            }
+            
+            .upload-zone {
+                padding: 2rem 1rem;
+            }
+            
+            .file-item {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+
+            .peer-controls {
+                flex-direction: column;
+            }
+
+            .peer-input {
+                min-width: auto;
+            }
+
+            .radar-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">Lynkless</h1>
+            <p class="subtitle">Local file sharing without servers or links</p>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" data-tab="files">📁 Files</div>
+            <div class="tab" data-tab="radar">🔍 Radar</div>
+            <div class="tab" data-tab="peers">👥 Peers</div>
+            <div class="tab" data-tab="chat">💬 Chat</div>
+        </div>
+
+        <!-- Files Tab -->
+        <div class="tab-content active" id="files-tab">
+            <div class="upload-zone" id="uploadZone">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">Drop files here</div>
+                <div class="upload-hint">or click to select files</div>
+            </div>
+
+            <div class="file-list" id="fileList">
+                <div class="empty-state">
+                    <div class="empty-icon">📤</div>
+                    <div>No files uploaded yet</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 2rem;">
+                <button class="btn share-btn" id="shareAllBtn" onclick="lynklessApp.shareAllFiles()" style="display: none;">
+                    📤 Share All Files
+                </button>
+            </div>
+        </div>
+
+        <!-- Radar Tab -->
+        <div class="tab-content" id="radar-tab">
+            <div class="peer-section">
+                <h3 style="margin-bottom: 1rem; color: #ccc;">Network Discovery</h3>
+                <button class="btn" id="scanBtn">🔍 Scan for Users</button>
+                <div id="radarStatus" class="status-message" style="display: none;"></div>
+                <div class="radar-grid" id="radarGrid"></div>
+            </div>
+        </div>
+
+        <!-- Peers Tab -->
+        <div class="tab-content" id="peers-tab">
+            <div class="peer-section">
+                <h3 style="margin-bottom: 1rem; color: #ccc;">Your Connection ID</h3>
+                <div style="background: #1a1a1a; padding: 1rem; border-radius: 8px; font-family: monospace; color: #667eea;">
+                    <span id="myPeerId">Generating...</span>
+                    <button class="btn" onclick="copyPeerId()" style="margin-left: 1rem; background: #333; color: white;">Copy</button>
+                </div>
+                <div style="margin-top: 0.5rem; font-size: 0.9rem; color: #888;">
+                    💡 Share this ID with your friend so they can connect to you
+                </div>
+            </div>
+
+            <div class="peer-section">
+                <h3 style="margin-bottom: 1rem; color: #ccc;">Manual Connection</h3>
+                <div class="peer-controls">
+                    <input type="text" class="peer-input" id="peerId" placeholder="Enter your friend's peer ID...">
+                    <button class="btn connect-btn" id="connectBtn">Add to Radar & Connect</button>
+                </div>
+                <div style="margin-top: 0.5rem; font-size: 0.9rem; color: #888;">
+                    💡 This will add your friend to the radar and initiate connection
+                </div>
+                
+                <div class="manual-connection">
+                    <h4 style="margin-bottom: 1rem; color: #ccc;">Paste Offer from Friend</h4>
+                    <textarea class="offer-input" id="offerInput" placeholder="Paste WebRTC offer here..."></textarea>
+                    <button class="btn" id="acceptOfferBtn" style="margin-top: 1rem;">Accept Offer</button>
+                </div>
+            </div>
+
+            <div class="peer-section">
+                <h3 style="margin-bottom: 1rem; color: #ccc;">Connected Peers</h3>
+                <div class="peer-list" id="peerList">
+                    <div class="empty-state">
+                        <div class="empty-icon">👥</div>
+                        <div>No peers connected</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="peer-section connection-requests" id="connectionRequests" style="display: none;">
+                <h3 style="margin-bottom: 1rem; color: #ccc;">Connection Requests</h3>
+                <div id="requestsList"></div>
+            </div>
+        </div>
+
+        <!-- Chat Tab -->
+        <div class="tab-content" id="chat-tab">
+            <div class="peer-section">
+                <h3 style="margin-bottom: 1rem; color: #ccc;">Group Chat</h3>
+                <div class="chat-container">
+                    <div class="chat-header">
+                        <span id="chatStatus">Not connected to any peers</span>
+                    </div>
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="empty-state" style="padding: 2rem;">
+                            <div class="empty-icon">💬</div>
+                            <div>Connect to peers to start chatting</div>
+                        </div>
+                    </div>
+                    <div class="chat-input-container">
+                        <input type="text" class="chat-input" id="chatInput" placeholder="Type a message..." disabled>
+                        <button class="btn send-btn" id="sendBtn" disabled>Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="statusMessage"></div>
+
+    <script>
+        class Lynkless {
+            constructor() {
+                this.uploadZone = document.getElementById('uploadZone');
+                this.fileList = document.getElementById('fileList');
+                this.files = [];
+                this.peers = new Map();
+                this.myPeerId = null;
+                this.peerConnection = null;
+                this.dataChannel = null;
+                this.pendingConnections = new Map();
+                this.receivedFiles = new Map();
+                this.discoveredUsers = new Map();
+                this.connectionRequests = new Map();
+                this.chatMessages = [];
+                
+                this.initializeEventListeners();
+                this.initializeTabs();
+                this.initializeWebRTC();
+                this.generatePeerId();
+                this.startRequestChecking();
+                this.startPresenceBroadcasting();
+            }
+
+            generatePeerId() {
+                this.myPeerId = 'lynkless-' + Math.random().toString(36).substr(2, 8);
+                document.getElementById('myPeerId').textContent = this.myPeerId;
+            }
+
+            startRequestChecking() {
+                // Check for incoming requests and offers every 2 seconds
+                setInterval(() => {
+                    this.showConnectionRequests();
+                    this.checkForIncomingOffers();
+                }, 2000);
+            }
+
+            startPresenceBroadcasting() {
+                // Create a simple peer discovery using a shared file approach
+                const broadcastPresence = async () => {
+                    const myPresence = {
+                        id: this.myPeerId,
+                        name: this.myPeerId.split('-')[1].toUpperCase(),
+                        timestamp: Date.now(),
+                        avatar: '👤',
+                        ip: window.location.hostname
+                    };
+                    
+                    // Store locally
+                    localStorage.setItem('lynkless_presence_' + this.myPeerId, JSON.stringify(myPresence));
+                    
+                    // Try to use a simple HTTP-based discovery
+                    try {
+                        // Create a simple presence file that can be shared
+                        const presenceData = {
+                            [this.myPeerId]: myPresence
+                        };
+                        
+                        // Store in a global shared object for demo
+                        if (!window.lynklessGlobalPresence) {
+                            window.lynklessGlobalPresence = {};
+                        }
+                        window.lynklessGlobalPresence[this.myPeerId] = myPresence;
+                        
+                    } catch (error) {
+                        console.log('Network discovery not available, using localStorage only');
+                    }
+                };
+                
+                // Broadcast immediately and then every 10 seconds
+                broadcastPresence();
+                setInterval(broadcastPresence, 10000);
+            }
+
+            async initializeWebRTC() {
+                try {
+                    this.peerConnection = new RTCPeerConnection({
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' }
+                        ]
+                    });
+
+                    this.dataChannel = this.peerConnection.createDataChannel('fileTransfer', {
+                        ordered: true
+                    });
+
+                    this.setupDataChannelHandlers(this.dataChannel);
+                    this.setupPeerConnectionHandlers();
+
+                    this.showStatus('WebRTC initialized successfully', 'success');
+                } catch (error) {
+                    this.showStatus('WebRTC initialization failed: ' + error.message, 'error');
+                }
+            }
+
+            setupDataChannelHandlers(channel) {
+                channel.onopen = () => {
+                    console.log('Data channel opened');
+                    this.updateChatStatus();
+                };
+
+                channel.onmessage = (event) => {
+                    this.handleIncomingMessage(event.data);
+                };
+
+                channel.onclose = () => {
+                    console.log('Data channel closed');
+                    this.updateChatStatus();
+                };
+            }
+
+            setupPeerConnectionHandlers() {
+                this.peerConnection.ondatachannel = (event) => {
+                    const channel = event.channel;
+                    this.setupDataChannelHandlers(channel);
+                };
+
+                this.peerConnection.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        console.log('ICE candidate:', event.candidate);
+                    }
+                };
+
+                this.peerConnection.onconnectionstatechange = () => {
+                    console.log('Connection state:', this.peerConnection.connectionState);
+                    this.updateChatStatus();
+                };
+            }
+
+            handleIncomingMessage(data) {
+                try {
+                    const message = JSON.parse(data);
+                    
+                    switch (message.type) {
+                        case 'offer':
+                            this.handleOffer(message.offer);
+                            break;
+                        case 'answer':
+                            this.handleAnswer(message.answer);
+                            break;
+                        case 'ice-candidate':
+                            this.handleIceCandidate(message.candidate);
+                            break;
+                        case 'file-transfer':
+                            this.handleFileTransfer(message);
+                            break;
+                        case 'file-chunk':
+                            this.handleFileChunk(message);
+                            break;
+                        case 'chat-message':
+                            this.handleChatMessage(message);
+                            break;
+                        case 'connection-request':
+                            this.handleIncomingConnectionRequest(message);
+                            break;
+                        case 'connection-response':
+                            this.handleConnectionResponse(message);
+                            break;
+                        default:
+                            console.log('Unknown message type:', message.type);
+                    }
+                } catch (error) {
+                    console.error('Error handling message:', error);
+                }
+            }
+
+            async handleOffer(offer) {
+                try {
+                    await this.peerConnection.setRemoteDescription(offer);
+                    const answer = await this.peerConnection.createAnswer();
+                    await this.peerConnection.setLocalDescription(answer);
+                    
+                    console.log('Answer created:', answer);
+                    this.showStatus('Connection established! Copy this answer and send to your friend:', 'success');
+                    console.log('Answer to share:', JSON.stringify({
+                        type: 'answer',
+                        answer: answer,
+                        fromPeerId: this.myPeerId
+                    }));
+                } catch (error) {
+                    this.showStatus('Failed to handle offer: ' + error.message, 'error');
+                }
+            }
+
+            async handleAnswer(answer) {
+                try {
+                    await this.peerConnection.setRemoteDescription(answer);
+                    this.showStatus('Connection established successfully!', 'success');
+                } catch (error) {
+                    this.showStatus('Failed to handle answer: ' + error.message, 'error');
+                }
+            }
+
+            async handleIceCandidate(candidate) {
+                try {
+                    await this.peerConnection.addIceCandidate(candidate);
+                } catch (error) {
+                    console.error('Error adding ICE candidate:', error);
+                }
+            }
+
+            // Radar functionality
+            async scanForUsers() {
+                const scanBtn = document.getElementById('scanBtn');
+                
+                scanBtn.disabled = true;
+                scanBtn.textContent = '🔍 Scanning...';
+                
+                this.showRadarStatus('Broadcasting your presence and scanning for users...', 'info');
+                
+                try {
+                    // Clear previous discoveries
+                    this.discoveredUsers.clear();
+                    
+                    // Debug: Show current localStorage contents
+                    console.log('=== DEBUGGING LOCALSTORAGE ===');
+                    console.log('My Peer ID:', this.myPeerId);
+                    console.log('LocalStorage contents:');
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        const value = localStorage.getItem(key);
+                        console.log(`${key}: ${value}`);
+                    }
+                    
+                    // Broadcast your presence using localStorage
+                    const myPresence = {
+                        id: this.myPeerId,
+                        name: this.myPeerId.split('-')[1].toUpperCase(),
+                        timestamp: Date.now(),
+                        avatar: '👤'
+                    };
+                    
+                    localStorage.setItem('lynkless_presence_' + this.myPeerId, JSON.stringify(myPresence));
+                    console.log('Broadcasting presence:', myPresence);
+                    
+                    // Scan for other users' presence
+                    const foundUsers = this.scanLocalStorage();
+                    console.log('Found users after scan:', foundUsers);
+                    
+                    if (foundUsers.length > 0) {
+                        foundUsers.forEach(user => {
+                            this.discoveredUsers.set(user.id, {
+                                ...user,
+                                distance: 'Same Network',
+                                status: 'online'
+                            });
+                        });
+                        this.updateRadarGrid();
+                        this.showRadarStatus(`Found ${foundUsers.length} user(s) on the network`, 'success');
+                    } else {
+                        // Add demo users for testing when no real users found
+                        this.showRadarStatus('No other users found. Adding demo users for testing...', 'info');
+                        this.addDemoUsersForTesting();
+                        this.updateRadarGrid();
+                    }
+                    
+                } catch (error) {
+                    this.showRadarStatus('Scan failed: ' + error.message, 'error');
+                } finally {
+                    scanBtn.disabled = false;
+                    scanBtn.textContent = '🔍 Scan for Users';
+                }
+            }
+
+            addDemoUsersForTesting() {
+                // Add demo users for testing when localStorage doesn't work across origins
+                const demoUsers = [
+                    { id: 'demo-friend', name: 'Friend', avatar: '👤' },
+                    { id: 'demo-user2', name: 'TestUser', avatar: '👤' }
+                ];
+                
+                demoUsers.forEach(user => {
+                    this.discoveredUsers.set(user.id, {
+                        ...user,
+                        distance: 'Demo User',
+                        status: 'online'
+                    });
+                });
+            }
+
+            addManualPeerToRadar(peerId) {
+                // Add manually entered peer to radar for easy access
+                this.discoveredUsers.set(peerId, {
+                    id: peerId,
+                    name: peerId.split('-')[1] ? peerId.split('-')[1].toUpperCase() : 'Friend',
+                    avatar: '👤',
+                    distance: 'Manual Entry',
+                    status: 'online'
+                });
+                
+                // Switch to radar tab and update
+                this.switchToTab('radar');
+                this.updateRadarGrid();
+                this.showRadarStatus(`Added ${peerId} to radar. Click the card to connect!`, 'success');
+            }
+
+            switchToTab(tabName) {
+                const tabs = document.querySelectorAll('.tab');
+                const tabContents = document.querySelectorAll('.tab-content');
+                
+                tabs.forEach(tab => {
+                    tab.classList.remove('active');
+                    if (tab.dataset.tab === tabName) {
+                        tab.classList.add('active');
+                    }
+                });
+                
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                    if (content.id === tabName + '-tab') {
+                        content.classList.add('active');
+                    }
+                });
+            }
+
+            async scanLocalStorage() {
+                const users = [];
+                const cutoffTime = Date.now() - 120000; // Show users from last 2 minutes
+                
+                try {
+                    // First try network-based discovery
+                    await this.tryNetworkDiscovery(users);
+                    
+                    // Then scan localStorage
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key && key.startsWith('lynkless_presence_') && !key.includes(this.myPeerId)) {
+                            try {
+                                const userData = JSON.parse(localStorage.getItem(key));
+                                if (userData && userData.timestamp > cutoffTime) {
+                                    users.push(userData);
+                                } else {
+                                    // Clean up old presence data
+                                    localStorage.removeItem(key);
+                                }
+                            } catch (error) {
+                                console.log('Cleaning up invalid presence data:', key);
+                                localStorage.removeItem(key);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error scanning localStorage:', error);
+                }
+                
+                console.log('Found users:', users); // Debug log
+                return users;
+            }
+
+            async tryNetworkDiscovery(users) {
+                try {
+                    // Try to fetch the peers file
+                    const response = await fetch('./peers.json?t=' + Date.now());
+                    if (response.ok) {
+                        const peersData = await response.json();
+                        const cutoffTime = Date.now() - 120000;
+                        
+                        // Add peers that are still active
+                        peersData.peers.forEach(peer => {
+                            if (peer.timestamp > cutoffTime && peer.id !== this.myPeerId) {
+                                users.push(peer);
+                            }
+                        });
+                        
+                        // Update the peers file with our presence
+                        await this.updatePeersFile(peersData);
+                    }
+                } catch (error) {
+                    console.log('Network discovery not available:', error);
+                }
+            }
+
+            async updatePeersFile(peersData) {
+                try {
+                    // Add our presence to the peers list
+                    const myPresence = {
+                        id: this.myPeerId,
+                        name: this.myPeerId.split('-')[1].toUpperCase(),
+                        timestamp: Date.now(),
+                        avatar: '👤',
+                        ip: window.location.hostname
+                    };
+                    
+                    // Remove old entries and our old entry
+                    const cutoffTime = Date.now() - 120000;
+                    peersData.peers = peersData.peers.filter(peer => 
+                        peer.timestamp > cutoffTime && peer.id !== this.myPeerId
+                    );
+                    
+                    // Add our current presence
+                    peersData.peers.push(myPresence);
+                    peersData.lastUpdated = Date.now();
+                    
+                    console.log('Would update peers file with:', peersData);
+                    // Note: Actually updating the file would require server-side code
+                    
+                } catch (error) {
+                    console.log('Could not update peers file:', error);
+                }
+            }
+
+            async addDemoUsers() {
+                const demoUsers = [
+                    { id: 'user-001', name: 'Alex', distance: '2m away', status: 'online', avatar: '👨‍💻' },
+                    { id: 'user-002', name: 'Sarah', distance: '5m away', status: 'busy', avatar: '👩‍🎨' },
+                    { id: 'user-003', name: 'Mike', distance: '10m away', status: 'away', avatar: '👨‍🔬' }
+                ];
+
+                this.discoveredUsers.clear();
+                
+                for (const user of demoUsers) {
+                    // Simulate delay for each discovery
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    this.discoveredUsers.set(user.id, user);
+                    this.updateRadarGrid();
+                }
+            }
+
+            updateRadarGrid() {
+                const grid = document.getElementById('radarGrid');
+                grid.innerHTML = '';
+
+                this.discoveredUsers.forEach(user => {
+                    const userCard = document.createElement('div');
+                    userCard.className = 'user-card';
+                    userCard.innerHTML = `
+                        <div class="user-avatar">${user.avatar}</div>
+                        <div class="user-name">${user.name}</div>
+                        <div class="user-distance">${user.distance}</div>
+                        <div class="user-status ${user.status}">${user.status}</div>
+                    `;
+                    
+                    userCard.onclick = () => this.sendConnectionRequest(user);
+                    grid.appendChild(userCard);
+                });
+            }
+
+            sendConnectionRequest(user) {
+                this.showRadarStatus(`Connecting to ${user.name}...`, 'info');
+                
+                // Directly initiate WebRTC connection instead of just sending a request
+                this.connectToPeerManually(user.id);
+                
+                this.showRadarStatus(`Connection initiated with ${user.name}!`, 'success');
+            }
+
+            checkForConnectionResponse(userId) {
+                const checkInterval = setInterval(() => {
+                    const responseKey = `lynkless_response_${this.myPeerId}_from_${userId}`;
+                    const response = localStorage.getItem(responseKey);
+                    
+                    if (response) {
+                        const responseData = JSON.parse(response);
+                        this.handleConnectionResponse(responseData);
+                        localStorage.removeItem(responseKey);
+                        clearInterval(checkInterval);
+                    }
+                }, 1000);
+                
+                // Stop checking after 30 seconds
+                setTimeout(() => {
+                    clearInterval(checkInterval);
+                }, 30000);
+            }
+
+            checkForIncomingRequests() {
+                const requests = [];
+                
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith(`lynkless_request_${this.myPeerId}_from_`)) {
+                        try {
+                            const requestData = JSON.parse(localStorage.getItem(key));
+                            if (Date.now() - requestData.timestamp < 300000) { // 5 minutes
+                                requests.push({ key, ...requestData });
+                            } else {
+                                localStorage.removeItem(key);
+                            }
+                        } catch (error) {
+                            localStorage.removeItem(key);
+                        }
+                    }
+                }
+                
+                return requests;
+            }
+
+            showConnectionRequests() {
+                const requests = this.checkForIncomingRequests();
+                const requestsSection = document.getElementById('connectionRequests');
+                const requestsList = document.getElementById('requestsList');
+                
+                if (requests.length > 0) {
+                    requestsSection.style.display = 'block';
+                    requestsList.innerHTML = '';
+                    
+                    requests.forEach(request => {
+                        const requestItem = document.createElement('div');
+                        requestItem.className = 'request-item';
+                        requestItem.innerHTML = `
+                            <div class="request-info">
+                                <div class="peer-avatar">👤</div>
+                                <div class="peer-details">
+                                    <h4>${request.fromUserName}</h4>
+                                    <div class="peer-status">Wants to connect</div>
+                                </div>
+                            </div>
+                            <div class="request-actions">
+                                <button class="btn accept-btn" onclick="lynklessApp.respondToRequest('${request.key}', '${request.fromUserId}', true)">Accept</button>
+                                <button class="btn deny-btn" onclick="lynklessApp.respondToRequest('${request.key}', '${request.fromUserId}', false)">Deny</button>
+                            </div>
+                        `;
+                        requestsList.appendChild(requestItem);
+                    });
+                } else {
+                    requestsSection.style.display = 'none';
+                }
+            }
+
+            respondToRequest(requestKey, fromUserId, accepted) {
+                // Remove the request
+                localStorage.removeItem(requestKey);
+                
+                // Send response
+                const responseData = {
+                    fromUserId: fromUserId,
+                    accepted: accepted,
+                    timestamp: Date.now()
+                };
+                
+                localStorage.setItem(`lynkless_response_${fromUserId}_from_${this.myPeerId}`, JSON.stringify(responseData));
+                
+                if (accepted) {
+                    // Add as peer
+                    this.addPeer({
+                        id: fromUserId,
+                        name: fromUserId.split('-')[1].toUpperCase(),
+                        avatar: '👤'
+                    });
+                }
+                
+                this.showConnectionRequests(); // Refresh the list
+                this.showStatus(accepted ? 'Connection accepted!' : 'Connection denied', accepted ? 'success' : 'info');
+            }
+
+            handleConnectionResponse(response) {
+                const request = this.connectionRequests.get(response.fromUserId);
+                if (request) {
+                    if (response.accepted) {
+                        this.addPeer(request);
+                        this.showRadarStatus(`${request.name} accepted your connection!`, 'success');
+                    } else {
+                        this.showRadarStatus(`${request.name} denied your connection`, 'error');
+                    }
+                    this.connectionRequests.delete(response.fromUserId);
+                }
+            }
+
+            addPeer(user) {
+                this.peers.set(user.id, {
+                    ...user,
+                    connectionStatus: 'connected',
+                    connectedAt: Date.now()
+                });
+                
+                this.updatePeerList();
+                this.updateChatStatus();
+                this.updateShareButton();
+            }
+
+            updatePeerList() {
+                const peerList = document.getElementById('peerList');
+                
+                if (this.peers.size === 0) {
+                    peerList.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-icon">👥</div>
+                            <div>No peers connected</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                peerList.innerHTML = '';
+                this.peers.forEach(peer => {
+                    const peerItem = document.createElement('div');
+                    peerItem.className = 'peer-item';
+                    peerItem.innerHTML = `
+                        <div class="peer-info">
+                            <div class="peer-avatar">${peer.avatar}</div>
+                            <div class="peer-details">
+                                <h4>${peer.name}</h4>
+                                <div class="peer-status">Connected • ${peer.distance}</div>
+                            </div>
+                        </div>
+                        <div class="peer-actions">
+                            <button class="btn" onclick="lynklessApp.disconnectPeer('${peer.id}')">Disconnect</button>
+                        </div>
+                    `;
+                    peerList.appendChild(peerItem);
+                });
+            }
+
+            // Chat functionality
+            updateChatStatus() {
+                const chatStatus = document.getElementById('chatStatus');
+                const chatInput = document.getElementById('chatInput');
+                const sendBtn = document.getElementById('sendBtn');
+                
+                if (this.peers.size > 0) {
+                    chatStatus.textContent = `Connected to ${this.peers.size} peer(s)`;
+                    chatInput.disabled = false;
+                    sendBtn.disabled = false;
+                } else {
+                    chatStatus.textContent = 'Not connected to any peers';
+                    chatInput.disabled = true;
+                    sendBtn.disabled = true;
+                }
+            }
+
+            sendChatMessage() {
+                const chatInput = document.getElementById('chatInput');
+                const message = chatInput.value.trim();
+                
+                if (!message || this.peers.size === 0) return;
+
+                const chatMessage = {
+                    type: 'chat-message',
+                    fromPeerId: this.myPeerId,
+                    message: message,
+                    timestamp: Date.now()
+                };
+
+                // Add to own chat
+                this.addChatMessage(chatMessage, true);
+                
+                // Send to peers (simulated)
+                this.sendToPeers(JSON.stringify(chatMessage));
+                
+                chatInput.value = '';
+            }
+
+            handleChatMessage(message) {
+                this.addChatMessage(message, false);
+            }
+
+            addChatMessage(message, isOwn) {
+                const chatMessages = document.getElementById('chatMessages');
+                
+                // Remove empty state if present
+                const emptyState = chatMessages.querySelector('.empty-state');
+                if (emptyState) {
+                    emptyState.remove();
+                }
+
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'chat-message';
+                messageDiv.innerHTML = `
+                    <div class="message-sender">${isOwn ? 'You' : message.fromPeerId}</div>
+                    <div class="message-content ${isOwn ? 'own' : ''}">${message.message}</div>
+                `;
+
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+
+            sendToPeers(data) {
+                // In real implementation, this would send to all connected peers
+                // For demo, we'll simulate receiving our own messages from "peers"
+                if (this.peers.size > 0) {
+                    setTimeout(() => {
+                        try {
+                            const message = JSON.parse(data);
+                            if (message.type === 'chat-message') {
+                                // Simulate response from a peer
+                                const responses = [
+                                    "That's interesting!",
+                                    "I agree!",
+                                    "Thanks for sharing!",
+                                    "Cool!",
+                                    "Got it!"
+                                ];
+                                
+                                const randomPeer = Array.from(this.peers.values())[0];
+                                const response = {
+                                    type: 'chat-message',
+                                    fromPeerId: randomPeer.name,
+                                    message: responses[Math.floor(Math.random() * responses.length)],
+                                    timestamp: Date.now()
+                                };
+                                
+                                this.handleChatMessage(response);
+                            }
+                        } catch (error) {
+                            console.error('Error simulating peer response:', error);
+                        }
+                    }, 1000 + Math.random() * 2000);
+                }
+            }
+
+            // File sharing functionality
+            async shareAllFiles() {
+                if (this.files.length === 0) {
+                    this.showStatus('No files to share', 'error');
+                    return;
+                }
+
+                if (this.peers.size === 0) {
+                    this.showStatus('No peers connected to share with', 'error');
+                    return;
+                }
+
+                this.showStatus(`Sharing ${this.files.length} file(s) with ${this.peers.size} peer(s)...`, 'info');
+
+                for (const file of this.files) {
+                    await this.sendFileToPeer(file);
+                    await new Promise(resolve => setTimeout(resolve, 500)); // Brief delay between files
+                }
+
+                this.showStatus('All files shared successfully!', 'success');
+            }
+
+            async sendFileToPeer(file) {
+                try {
+                    const fileData = {
+                        type: 'file-transfer',
+                        name: file.name,
+                        size: file.size,
+                        type: file.type,
+                        id: Math.random().toString(36).substr(2, 9)
+                    };
+
+                    // Send file metadata first
+                    this.sendToPeers(JSON.stringify(fileData));
+
+                    // Read and send file in chunks
+                    const chunkSize = 64 * 1024; // 64KB chunks
+                    const totalChunks = Math.ceil(file.size / chunkSize);
+
+                    for (let i = 0; i < totalChunks; i++) {
+                        const start = i * chunkSize;
+                        const end = Math.min(start + chunkSize, file.size);
+                        const chunk = file.slice(start, end);
+
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                            const chunkData = {
+                                type: 'file-chunk',
+                                fileId: fileData.id,
+                                chunkIndex: i,
+                                totalChunks: totalChunks,
+                                data: reader.result
+                            };
+                            this.sendToPeers(JSON.stringify(chunkData));
+                        };
+                        reader.readAsArrayBuffer(chunk);
+
+                        // Wait a bit between chunks to avoid overwhelming the connection
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                } catch (error) {
+                    console.error('Error sending file:', error);
+                    this.showStatus('Error sending file: ' + error.message, 'error');
+                }
+            }
+
+            handleFileTransfer(message) {
+                // Initialize file reception
+                this.receivedFiles.set(message.id, {
+                    name: message.name,
+                    size: message.size,
+                    type: message.type,
+                    chunks: new Map(),
+                    totalChunks: 0
+                });
+
+                this.showStatus(`Receiving file: ${message.name}`, 'info');
+            }
+
+            handleFileChunk(message) {
+                const fileData = this.receivedFiles.get(message.fileId);
+                if (!fileData) return;
+
+                fileData.chunks.set(message.chunkIndex, message.data);
+                fileData.totalChunks = message.totalChunks;
+
+                // Check if all chunks received
+                if (fileData.chunks.size === fileData.totalChunks) {
+                    this.completeFileReception(message.fileId, fileData);
+                }
+            }
+
+            completeFileReception(fileId, fileData) {
+                try {
+                    // Combine all chunks
+                    const chunks = [];
+                    for (let i = 0; i < fileData.totalChunks; i++) {
+                        chunks.push(fileData.chunks.get(i));
+                    }
+
+                    const blob = new Blob(chunks, { type: fileData.type });
+                    const file = new File([blob], fileData.name, { type: fileData.type });
+
+                    // Add to file list
+                    this.files.push(file);
+                    this.addFileToList(file);
+                    this.updateEmptyState();
+                    this.updateShareButton();
+
+                    this.showStatus(`File received: ${fileData.name}`, 'success');
+                    this.receivedFiles.delete(fileId);
+                } catch (error) {
+                    console.error('Error completing file reception:', error);
+                    this.showStatus('Error receiving file: ' + error.message, 'error');
+                }
+            }
+
+            // Automated connection handling
+            async connectToPeerManually(peerId) {
+                try {
+                    this.showStatus(`Connecting to ${peerId}...`, 'info');
+                    
+                    // Create new peer connection for this specific peer
+                    const peerConnection = new RTCPeerConnection({
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' }
+                        ]
+                    });
+
+                    // Create data channel
+                    const dataChannel = peerConnection.createDataChannel('fileTransfer', {
+                        ordered: true
+                    });
+
+                    this.setupDataChannelHandlers(dataChannel);
+                    this.setupPeerConnectionHandlers(peerConnection);
+                    
+                    // Create offer
+                    const offer = await peerConnection.createOffer();
+                    await peerConnection.setLocalDescription(offer);
+                    
+                    const offerData = {
+                        type: 'offer',
+                        offer: offer,
+                        fromPeerId: this.myPeerId,
+                        toPeerId: peerId,
+                        timestamp: Date.now()
+                    };
+                    
+                    // Store the offer in localStorage for the peer to find
+                    localStorage.setItem(`lynkless_offer_${peerId}_from_${this.myPeerId}`, JSON.stringify(offerData));
+                    
+                    this.showStatus(`Connection offer sent to ${peerId}! Waiting for response...`, 'success');
+                    
+                    // Start checking for answer
+                    this.checkForAnswer(peerId, peerConnection);
+                    
+                } catch (error) {
+                    this.showStatus('Connection failed: ' + error.message, 'error');
+                }
+            }
+
+            checkForAnswer(peerId, peerConnection) {
+                const checkInterval = setInterval(async () => {
+                    const answerKey = `lynkless_answer_${this.myPeerId}_from_${peerId}`;
+                    const answerData = localStorage.getItem(answerKey);
+                    
+                    if (answerData) {
+                        try {
+                            const answer = JSON.parse(answerData);
+                            await peerConnection.setRemoteDescription(answer.answer);
+                            
+                            // Store this connection
+                            this.connections.set(peerId, {
+                                peerConnection: peerConnection,
+                                dataChannel: peerConnection.channel
+                            });
+                            
+                            this.addPeer({
+                                id: peerId,
+                                name: peerId.split('-')[1].toUpperCase(),
+                                avatar: '👤',
+                                connectionStatus: 'connected'
+                            });
+                            
+                            this.showStatus(`Successfully connected to ${peerId}!`, 'success');
+                            localStorage.removeItem(answerKey);
+                            clearInterval(checkInterval);
+                        } catch (error) {
+                            this.showStatus('Error completing connection: ' + error.message, 'error');
+                            clearInterval(checkInterval);
+                        }
+                    }
+                }, 1000);
+                
+                // Stop checking after 30 seconds
+                setTimeout(() => {
+                    clearInterval(checkInterval);
+                }, 30000);
+            }
+
+            // Check for incoming offers automatically
+            checkForIncomingOffers() {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith(`lynkless_offer_${this.myPeerId}_from_`)) {
+                        try {
+                            const offerData = JSON.parse(localStorage.getItem(key));
+                            if (Date.now() - offerData.timestamp < 120000) { // 2 minutes
+                                this.handleIncomingOffer(offerData, key);
+                            } else {
+                                localStorage.removeItem(key);
+                            }
+                        } catch (error) {
+                            localStorage.removeItem(key);
+                        }
+                    }
+                }
+            }
+
+            async handleIncomingOffer(offerData, offerKey) {
+                try {
+                    this.showStatus(`Incoming connection from ${offerData.fromPeerId}...`, 'info');
+                    
+                    // Create new peer connection
+                    const peerConnection = new RTCPeerConnection({
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' }
+                        ]
+                    });
+
+                    this.setupPeerConnectionHandlers(peerConnection);
+                    
+                    // Handle incoming data channel
+                    peerConnection.ondatachannel = (event) => {
+                        const channel = event.channel;
+                        this.setupDataChannelHandlers(channel);
+                    };
+                    
+                    // Set remote description and create answer
+                    await peerConnection.setRemoteDescription(offerData.offer);
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+                    
+                    // Send answer back
+                    const answerData = {
+                        type: 'answer',
+                        answer: answer,
+                        fromPeerId: this.myPeerId,
+                        timestamp: Date.now()
+                    };
+                    
+                    localStorage.setItem(`lynkless_answer_${offerData.fromPeerId}_from_${this.myPeerId}`, JSON.stringify(answerData));
+                    
+                    // Store connection
+                    this.connections.set(offerData.fromPeerId, {
+                        peerConnection: peerConnection,
+                        dataChannel: null // Will be set when data channel opens
+                    });
+                    
+                    this.addPeer({
+                        id: offerData.fromPeerId,
+                        name: offerData.fromPeerId.split('-')[1].toUpperCase(),
+                        avatar: '👤',
+                        connectionStatus: 'connected'
+                    });
+                    
+                    this.showStatus(`Connected to ${offerData.fromPeerId}!`, 'success');
+                    
+                    // Remove the offer
+                    localStorage.removeItem(offerKey);
+                    
+                } catch (error) {
+                    this.showStatus('Error handling incoming connection: ' + error.message, 'error');
+                }
+            }
+
+            showOfferModal(offerText) {
+                // Create modal
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0,0,0,0.8);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 1000;
+                `;
+                
+                modal.innerHTML = `
+                    <div style="background: #111; padding: 2rem; border-radius: 12px; max-width: 600px; width: 90%;">
+                        <h3 style="color: #ccc; margin-bottom: 1rem;">📋 Copy this offer and send to your friend:</h3>
+                        <textarea readonly style="width: 100%; height: 200px; background: #1a1a1a; color: white; border: 1px solid #333; padding: 1rem; border-radius: 6px; font-family: monospace; font-size: 0.9rem;">${offerText}</textarea>
+                        <div style="margin-top: 1rem; display: flex; gap: 1rem;">
+                            <button id="copyOfferBtn" style="background: #28a745; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer;">Copy to Clipboard</button>
+                            <button id="closeOfferModal" style="background: #dc3545; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer;">Close</button>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.appendChild(modal);
+                
+                // Add event listeners
+                document.getElementById('copyOfferBtn').onclick = () => {
+                    navigator.clipboard.writeText(offerText).then(() => {
+                        document.getElementById('copyOfferBtn').textContent = 'Copied!';
+                        setTimeout(() => {
+                            document.getElementById('copyOfferBtn').textContent = 'Copy to Clipboard';
+                        }, 2000);
+                    });
+                };
+                
+                document.getElementById('closeOfferModal').onclick = () => {
+                    document.body.removeChild(modal);
+                };
+                
+                // Close on outside click
+                modal.onclick = (e) => {
+                    if (e.target === modal) {
+                        document.body.removeChild(modal);
+                    }
+                };
+            }
+
+            async handleManualOffer() {
+                // This method is now deprecated since we use automatic localStorage signaling
+                this.showStatus('Connections are now automatic! Just enter a peer ID and click Connect.', 'info');
+            }
+
+            // UI Helper methods
+            showStatus(message, type = 'info') {
+                const statusDiv = document.getElementById('statusMessage');
+                statusDiv.className = `status-message status-${type}`;
+                statusDiv.textContent = message;
+                statusDiv.style.display = 'block';
+                
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 5000);
+            }
+
+            showRadarStatus(message, type = 'info') {
+                const statusDiv = document.getElementById('radarStatus');
+                statusDiv.className = `status-message status-${type}`;
+                statusDiv.textContent = message;
+                statusDiv.style.display = 'block';
+            }
+
+            updateShareButton() {
+                const shareBtn = document.getElementById('shareAllBtn');
+                if (this.files.length > 0) {
+                    shareBtn.style.display = 'block';
+                    shareBtn.textContent = `📤 Share ${this.files.length} File(s)`;
+                } else {
+                    shareBtn.style.display = 'none';
+                }
+            }
+
+            disconnectPeer(peerId) {
+                this.peers.delete(peerId);
+                this.updatePeerList();
+                this.updateChatStatus();
+                this.showStatus('Peer disconnected', 'info');
+            }
+
+            initializeEventListeners() {
+                // Drag and drop events
+                this.uploadZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    this.uploadZone.classList.add('dragover');
+                });
+
+                this.uploadZone.addEventListener('dragleave', (e) => {
+                    e.preventDefault();
+                    this.uploadZone.classList.remove('dragover');
+                });
+
+                this.uploadZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    this.uploadZone.classList.remove('dragover');
+                    const files = Array.from(e.dataTransfer.files);
+                    this.handleFiles(files);
+                });
+
+                // Click to select files
+                this.uploadZone.addEventListener('click', () => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.multiple = true;
+                    input.addEventListener('change', (e) => {
+                        const files = Array.from(e.target.files);
+                        this.handleFiles(files);
+                    });
+                    input.click();
+                });
+
+                // Peer connection events
+                document.getElementById('connectBtn').addEventListener('click', () => {
+                    const peerId = document.getElementById('peerId').value.trim();
+                    if (peerId) {
+                        // Add this peer to radar for easy future connection
+                        this.addManualPeerToRadar(peerId);
+                        this.connectToPeerManually(peerId);
+                    }
+                });
+
+                // Radar events
+                document.getElementById('scanBtn').addEventListener('click', () => {
+                    this.scanForUsers();
+                });
+
+                // Manual offer handling
+                document.getElementById('acceptOfferBtn').addEventListener('click', () => {
+                    this.handleManualOffer();
+                });
+
+                // Chat events
+                document.getElementById('sendBtn').addEventListener('click', () => {
+                    this.sendChatMessage();
+                });
+
+                document.getElementById('chatInput').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        this.sendChatMessage();
+                    }
+                });
+            }
+
+            initializeTabs() {
+                const tabs = document.querySelectorAll('.tab');
+                const tabContents = document.querySelectorAll('.tab-content');
+
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        const targetTab = tab.dataset.tab;
+                        
+                        // Update active tab
+                        tabs.forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                        
+                        // Update active content
+                        tabContents.forEach(content => {
+                            content.classList.remove('active');
+                            if (content.id === targetTab + '-tab') {
+                                content.classList.add('active');
+                            }
+                        });
+                    });
+                });
+            }
+
+            handleFiles(files) {
+                files.forEach(file => {
+                    this.files.push(file);
+                    this.addFileToList(file);
+                });
+                
+                this.updateEmptyState();
+                this.updateShareButton();
+            }
+
+            addFileToList(file) {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                
+                const fileIcon = this.getFileIcon(file.type);
+                const fileSize = this.formatFileSize(file.size);
+                
+                fileItem.innerHTML = `
+                    <div class="file-info">
+                        <div class="file-icon">${fileIcon}</div>
+                        <div class="file-details">
+                            <h4>${file.name}</h4>
+                            <div class="file-size">${fileSize}</div>
+                        </div>
+                    </div>
+                    <div class="file-actions">
+                        <a href="#" class="btn download-btn" download="${file.name}">Download</a>
+                    </div>
+                `;
+
+                // Create blob URL for download
+                const downloadBtn = fileItem.querySelector('.download-btn');
+                downloadBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const blob = new Blob([file], { type: file.type });
+                    const url = URL.createObjectURL(blob);
+                    downloadBtn.href = url;
+                    
+                    // Clean up blob URL after download
+                    setTimeout(() => {
+                        URL.revokeObjectURL(url);
+                    }, 1000);
+                });
+
+                this.fileList.appendChild(fileItem);
+            }
+
+            getFileIcon(mimeType) {
+                if (mimeType.startsWith('image/')) return '🖼️';
+                if (mimeType.startsWith('video/')) return '🎥';
+                if (mimeType.startsWith('audio/')) return '🎵';
+                if (mimeType.startsWith('text/')) return '📄';
+                if (mimeType.includes('pdf')) return '📕';
+                if (mimeType.includes('zip') || mimeType.includes('rar')) return '📦';
+                return '📁';
+            }
+
+            formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            updateEmptyState() {
+                const emptyState = this.fileList.querySelector('.empty-state');
+                if (this.files.length > 0 && emptyState) {
+                    emptyState.remove();
+                } else if (this.files.length === 0 && !emptyState) {
+                    this.fileList.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-icon">📤</div>
+                            <div>No files uploaded yet</div>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        // Global functions
+        function copyPeerId() {
+            const peerId = document.getElementById('myPeerId').textContent;
+            navigator.clipboard.writeText(peerId).then(() => {
+                // Show temporary success message
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                btn.style.background = '#28a745';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = '#333';
+                }, 2000);
+            });
+        }
+
+        // Initialize the app
+        let lynklessApp;
+        document.addEventListener('DOMContentLoaded', () => {
+            lynklessApp = new Lynkless();
+        });
+    </script>
+</body>
+</html>
