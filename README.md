@@ -48,7 +48,7 @@ File Metadata → File Chunks (64KB) → File Assembly → Download
 - Local network access for peer discovery
 
 ### **Quick Start**
-1. **Open** `index.html` in your browser
+1. **Open** the app at https://sathvik-nagesh.github.io/lynkless/
 2. **Click** "📡 Radar" tab
 3. **Click** "🔍 Scan for Users" to discover peers
 4. **Click** "Connect" on any discovered user
