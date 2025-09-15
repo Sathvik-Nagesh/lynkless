@@ -88,11 +88,10 @@ python -m http.server 8000
 npx serve .
 ```
 
-### **GitHub Pages**
-1. Create repository named `lynkless`
-2. Upload `index.html` as `index.html`
-3. Enable GitHub Pages in repository settings
-4. Access at `https://yourusername.github.io/lynkless/`
+### **🚀 GitHub Pages (Live Now!)**
+1. **Go to**: https://github.com/Sathvik-Nagesh/lynkless
+2. **Settings** → **Pages** → **Deploy from branch** → **main** → **/ (root)**
+3. **Access your live app**: https://sathvik-nagesh.github.io/lynkless/
 
 ### **Production Deployment**
 - **HTTPS Required**: WebRTC requires secure connection
