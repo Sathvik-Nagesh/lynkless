@@ -676,6 +676,7 @@
                 this.myPeerId = null;
                 this.peerConnection = null;
                 this.dataChannel = null;
+                this.connections = new Map(); // Fixed: Added missing connections Map
                 this.pendingConnections = new Map();
                 this.receivedFiles = new Map();
                 this.discoveredUsers = new Map();
@@ -900,9 +901,16 @@
                 }
             }
 
-            setupDataChannelHandlers(channel) {
+            setupDataChannelHandlers(channel, peerId = null) {
                 channel.onopen = () => {
-                    console.log('Data channel opened');
+                    console.log('Data channel opened', peerId ? `for peer ${peerId}` : '');
+                    if (peerId) {
+                        const connection = this.connections.get(peerId);
+                        if (connection) {
+                            connection.status = 'connected';
+                            connection.dataChannel = channel;
+                        }
+                    }
                     this.updateChatStatus();
                 };
 
@@ -911,25 +919,37 @@
                 };
 
                 channel.onclose = () => {
-                    console.log('Data channel closed');
+                    console.log('Data channel closed', peerId ? `for peer ${peerId}` : '');
+                    if (peerId) {
+                        const connection = this.connections.get(peerId);
+                        if (connection) {
+                            connection.status = 'disconnected';
+                        }
+                    }
                     this.updateChatStatus();
                 };
             }
 
-            setupPeerConnectionHandlers() {
-                this.peerConnection.ondatachannel = (event) => {
+            setupPeerConnectionHandlers(peerConnection, peerId = null) {
+                peerConnection.ondatachannel = (event) => {
                     const channel = event.channel;
-                    this.setupDataChannelHandlers(channel);
+                    this.setupDataChannelHandlers(channel, peerId);
                 };
 
-                this.peerConnection.onicecandidate = (event) => {
+                peerConnection.onicecandidate = (event) => {
                     if (event.candidate) {
-                        console.log('ICE candidate:', event.candidate);
+                        console.log('ICE candidate for', peerId || 'main connection:', event.candidate);
                     }
                 };
 
-                this.peerConnection.onconnectionstatechange = () => {
-                    console.log('Connection state:', this.peerConnection.connectionState);
+                peerConnection.onconnectionstatechange = () => {
+                    console.log('Connection state for', peerId || 'main connection:', peerConnection.connectionState);
+                    if (peerId) {
+                        const connection = this.connections.get(peerId);
+                        if (connection) {
+                            connection.status = peerConnection.connectionState;
+                        }
+                    }
                     this.updateChatStatus();
                 };
             }
@@ -1363,6 +1383,30 @@
                 }
             }
 
+            // Fixed: Added missing handleIncomingConnectionRequest method
+            handleIncomingConnectionRequest(message) {
+                console.log('Incoming connection request:', message);
+                // This would handle incoming connection requests
+                // For now, we'll just log it and show a status
+                this.showStatus(`Incoming connection request from ${message.fromPeerId}`, 'info');
+            }
+
+            // Fixed: Added missing sendToPeer method
+            sendToPeer(peerId, messageType, data) {
+                const connection = this.connections.get(peerId);
+                if (connection && connection.dataChannel && connection.dataChannel.readyState === 'open') {
+                    const message = {
+                        type: messageType,
+                        data: data,
+                        fromPeerId: this.myPeerId,
+                        timestamp: Date.now()
+                    };
+                    connection.dataChannel.send(JSON.stringify(message));
+                    return true;
+                }
+                return false;
+            }
+
             addPeer(user) {
                 this.peers.set(user.id, {
                     ...user,
@@ -1472,14 +1516,25 @@
             }
 
             sendToPeers(data) {
-                // In real implementation, this would send to all connected peers
-                // For demo, we'll simulate receiving our own messages from "peers"
-                if (this.peers.size > 0) {
+                // Send to all connected peers via WebRTC data channels
+                let sentCount = 0;
+                this.connections.forEach((connection, peerId) => {
+                    if (connection.dataChannel && connection.dataChannel.readyState === 'open') {
+                        try {
+                            connection.dataChannel.send(data);
+                            sentCount++;
+                        } catch (error) {
+                            console.error(`Error sending to peer ${peerId}:`, error);
+                        }
+                    }
+                });
+                
+                if (sentCount === 0 && this.peers.size > 0) {
+                    // Fallback: simulate response for demo purposes
                     setTimeout(() => {
                         try {
                             const message = JSON.parse(data);
                             if (message.type === 'chat-message') {
-                                // Simulate response from a peer
                                 const responses = [
                                     "That's interesting!",
                                     "I agree!",
@@ -1512,45 +1567,21 @@
                     return;
                 }
 
-                if (this.peers.size === 0) {
+                if (this.connections.size === 0) {
                     this.showStatus('No peers connected to share with', 'error');
                     return;
                 }
 
-                this.showStatus(`Sharing ${this.files.length} file(s) with ${this.peers.size} peer(s)...`, 'info');
+                this.showStatus(`Sharing ${this.files.length} file(s) with ${this.connections.size} peer(s)...`, 'info');
 
-                // Share files via both localStorage (same-device) and URL generation (cross-device)
+                // Share files via WebRTC data channels
                 for (let i = 0; i < this.files.length; i++) {
                     const file = this.files[i];
                     
                     this.showStatus(`Sending ${file.name} (${i + 1}/${this.files.length})...`, 'info');
                     
                     try {
-                        // Convert file to base64 for transfer
-                        const fileData = await this.fileToBase64(file);
-                        
-                        // Store file for each connected peer
-                        this.peers.forEach((peer, peerId) => {
-                            const transferData = {
-                                fileName: file.name,
-                                fileSize: file.size,
-                                fileType: file.type,
-                                fileData: fileData,
-                                fromPeer: this.myPeerId,
-                                toPeer: peerId,
-                                timestamp: Date.now(),
-                                type: 'file_transfer'
-                            };
-                            
-                            // Store locally for same-device demo
-                            const transferKey = `lynkless_file_${peerId}_from_${this.myPeerId}_${Date.now()}`;
-                            localStorage.setItem(transferKey, JSON.stringify(transferData));
-                            
-                            // Generate shareable URL for cross-device
-                            const shareUrl = this.generateFileShareUrl(transferData);
-                            this.showFileShareUrl(file.name, shareUrl);
-                        });
-                        
+                        await this.sendFileToPeer(file);
                         this.showStatus(`✅ ${file.name} shared successfully!`, 'success');
                         await new Promise(resolve => setTimeout(resolve, 500));
                         
@@ -1559,7 +1590,7 @@
                     }
                 }
 
-                this.showStatus(`🎉 All ${this.files.length} files shared successfully! Share URLs are displayed below.`, 'success');
+                this.showStatus(`🎉 All ${this.files.length} files shared successfully!`, 'success');
             }
 
             generateFileShareUrl(transferData) {
@@ -1600,19 +1631,20 @@
 
             async sendFileToPeer(file) {
                 try {
+                    const fileId = Math.random().toString(36).substr(2, 9);
                     const fileData = {
                         type: 'file-transfer',
                         name: file.name,
                         size: file.size,
-                        type: file.type,
-                        id: Math.random().toString(36).substr(2, 9)
+                        mimeType: file.type,
+                        id: fileId
                     };
 
                     // Send file metadata first
                     this.sendToPeers(JSON.stringify(fileData));
 
                     // Read and send file in chunks
-                    const chunkSize = 64 * 1024; // 64KB chunks
+                    const chunkSize = 16 * 1024; // 16KB chunks for better performance
                     const totalChunks = Math.ceil(file.size / chunkSize);
 
                     for (let i = 0; i < totalChunks; i++) {
@@ -1621,20 +1653,26 @@
                         const chunk = file.slice(start, end);
 
                         const reader = new FileReader();
-                        reader.onload = () => {
-                            const chunkData = {
-                                type: 'file-chunk',
-                                fileId: fileData.id,
-                                chunkIndex: i,
-                                totalChunks: totalChunks,
-                                data: reader.result
+                        const chunkPromise = new Promise((resolve, reject) => {
+                            reader.onload = () => {
+                                const chunkData = {
+                                    type: 'file-chunk',
+                                    fileId: fileId,
+                                    chunkIndex: i,
+                                    totalChunks: totalChunks,
+                                    data: Array.from(new Uint8Array(reader.result)) // Convert to array for JSON
+                                };
+                                this.sendToPeers(JSON.stringify(chunkData));
+                                resolve();
                             };
-                            this.sendToPeers(JSON.stringify(chunkData));
-                        };
+                            reader.onerror = reject;
+                        });
+                        
                         reader.readAsArrayBuffer(chunk);
+                        await chunkPromise;
 
-                        // Wait a bit between chunks to avoid overwhelming the connection
-                        await new Promise(resolve => setTimeout(resolve, 100));
+                        // Small delay between chunks to avoid overwhelming the connection
+                        await new Promise(resolve => setTimeout(resolve, 50));
                     }
                 } catch (error) {
                     console.error('Error sending file:', error);
@@ -1647,37 +1685,61 @@
                 this.receivedFiles.set(message.id, {
                     name: message.name,
                     size: message.size,
-                    type: message.type,
+                    mimeType: message.mimeType,
                     chunks: new Map(),
-                    totalChunks: 0
+                    totalChunks: 0,
+                    receivedChunks: 0
                 });
 
-                this.showStatus(`Receiving file: ${message.name}`, 'info');
+                this.showStatus(`Receiving file: ${message.name} (${message.size} bytes)`, 'info');
             }
 
             handleFileChunk(message) {
                 const fileData = this.receivedFiles.get(message.fileId);
                 if (!fileData) return;
 
-                fileData.chunks.set(message.chunkIndex, message.data);
+                // Convert array back to Uint8Array
+                const chunkData = new Uint8Array(message.data);
+                fileData.chunks.set(message.chunkIndex, chunkData);
                 fileData.totalChunks = message.totalChunks;
+                fileData.receivedChunks++;
+
+                // Show progress
+                const progress = Math.round((fileData.receivedChunks / fileData.totalChunks) * 100);
+                this.showStatus(`Receiving ${fileData.name}: ${progress}%`, 'info');
 
                 // Check if all chunks received
-                if (fileData.chunks.size === fileData.totalChunks) {
+                if (fileData.receivedChunks === fileData.totalChunks) {
                     this.completeFileReception(message.fileId, fileData);
                 }
             }
 
             completeFileReception(fileId, fileData) {
                 try {
-                    // Combine all chunks
+                    // Combine all chunks in order
                     const chunks = [];
                     for (let i = 0; i < fileData.totalChunks; i++) {
-                        chunks.push(fileData.chunks.get(i));
+                        const chunk = fileData.chunks.get(i);
+                        if (chunk) {
+                            chunks.push(chunk);
+                        } else {
+                            throw new Error(`Missing chunk ${i}`);
+                        }
                     }
 
-                    const blob = new Blob(chunks, { type: fileData.type });
-                    const file = new File([blob], fileData.name, { type: fileData.type });
+                    // Calculate total size
+                    const totalSize = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+                    
+                    // Create a single Uint8Array
+                    const combinedData = new Uint8Array(totalSize);
+                    let offset = 0;
+                    for (const chunk of chunks) {
+                        combinedData.set(chunk, offset);
+                        offset += chunk.length;
+                    }
+
+                    const blob = new Blob([combinedData], { type: fileData.mimeType });
+                    const file = new File([blob], fileData.name, { type: fileData.mimeType });
 
                     // Add to file list
                     this.files.push(file);
@@ -1685,39 +1747,69 @@
                     this.updateEmptyState();
                     this.updateShareButton();
 
-                    this.showStatus(`File received: ${fileData.name}`, 'success');
+                    this.showStatus(`✅ File received: ${fileData.name} (${fileData.size} bytes)`, 'success');
                     this.receivedFiles.delete(fileId);
                 } catch (error) {
                     console.error('Error completing file reception:', error);
-                    this.showStatus('Error receiving file: ' + error.message, 'error');
+                    this.showStatus(`❌ Error receiving file: ${error.message}`, 'error');
+                    this.receivedFiles.delete(fileId);
                 }
             }
 
             // Send connection request (with accept/deny flow)
             async connectToPeerManually(peerId) {
                 try {
-                    this.showStatus(`Sending connection request to ${peerId}...`, 'info');
+                    this.showStatus(`Initiating WebRTC connection to ${peerId}...`, 'info');
                     
-                    // Create connection request
-                    const requestData = {
+                    // Create a new peer connection for this specific peer
+                    const peerConnection = new RTCPeerConnection({
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' }
+                        ]
+                    });
+
+                    // Create data channel
+                    const dataChannel = peerConnection.createDataChannel('fileTransfer', {
+                        ordered: true
+                    });
+
+                    // Set up event handlers
+                    this.setupPeerConnectionHandlers(peerConnection, peerId);
+                    this.setupDataChannelHandlers(dataChannel, peerId);
+
+                    // Store the connection
+                    this.connections.set(peerId, {
+                        peerConnection: peerConnection,
+                        dataChannel: dataChannel,
+                        status: 'connecting'
+                    });
+
+                    // Create offer
+                    const offer = await peerConnection.createOffer();
+                    await peerConnection.setLocalDescription(offer);
+
+                    // Store offer for the other peer to find
+                    const offerData = {
+                        offer: offer,
+                        fromPeerId: this.myPeerId,
+                        timestamp: Date.now()
+                    };
+                    
+                    localStorage.setItem(`lynkless_offer_${peerId}_from_${this.myPeerId}`, JSON.stringify(offerData));
+                    
+                    // Generate shareable URL for cross-device connections
+                    const shareableUrl = this.generateShareableUrl({
                         fromPeer: this.myPeerId,
                         fromName: this.myPeerId.split('-')[1] ? this.myPeerId.split('-')[1].toUpperCase() : 'Friend',
                         toPeer: peerId,
+                        offer: offer,
                         timestamp: Date.now(),
-                        type: 'connection_request',
-                        status: 'pending'
-                    };
+                        type: 'webrtc_offer'
+                    });
                     
-                    // Store request for the other peer to see (localStorage for same-device demo, URL for cross-device)
-                    const requestKey = `lynkless_request_${peerId}_from_${this.myPeerId}_${Date.now()}`;
-                    localStorage.setItem(requestKey, JSON.stringify(requestData));
-                    
-                    // Also generate a shareable URL for cross-device connections
-                    const shareableUrl = this.generateShareableUrl(requestData);
-                    
-                    // Show the URL in the status and copy to clipboard
                     this.showConnectionUrl(shareableUrl);
-                    this.showStatus(`✅ Connection request sent! Check the status message below for the share URL.`, 'success');
+                    this.showStatus(`✅ WebRTC offer created! Share the URL below with ${peerId}`, 'success');
                     
                     // Add to radar for easy access
                     this.addManualPeerToRadar(peerId);

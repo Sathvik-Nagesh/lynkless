@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lynkless Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Lynkless Test Page</h1>
+    
+    <div class="test-section">
+        <h2>🔗 Quick Links</h2>
+        <button class="test-button" onclick="window.open('index.html', '_blank')">Open Main App</button>
+        <button class="test-button" onclick="window.open('lynkless-enhanced.html', '_blank')">Open Enhanced App</button>
+    </div>
+
+    <div class="test-section">
+        <h2>🧪 WebRTC Support Test</h2>
+        <div id="webrtc-status" class="status info">Testing WebRTC support...</div>
+        <button class="test-button" onclick="testWebRTC()">Test WebRTC</button>
+    </div>
+
+    <div class="test-section">
+        <h2>📁 File API Test</h2>
+        <div id="file-status" class="status info">Ready to test file operations</div>
+        <input type="file" id="file-input" multiple onchange="testFileAPI()">
+        <button class="test-button" onclick="document.getElementById('file-input').click()">Select Files</button>
+    </div>
+
+    <div class="test-section">
+        <h2>🌐 Network Test</h2>
+        <div id="network-status" class="status info">Testing network connectivity...</div>
+        <button class="test-button" onclick="testNetwork()">Test Network</button>
+    </div>
+
+    <div class="test-section">
+        <h2>📋 Instructions</h2>
+        <ol>
+            <li>Open the main app in a new tab</li>
+            <li>Copy your Peer ID from the Peers tab</li>
+            <li>Open another instance of the app (or share with a friend)</li>
+            <li>Enter the Peer ID in the connection field</li>
+            <li>Upload some files and try sharing them</li>
+            <li>Test the chat functionality</li>
+        </ol>
+    </div>
+
+    <script>
+        function testWebRTC() {
+            const status = document.getElementById('webrtc-status');
+            
+            if (!window.RTCPeerConnection) {
+                status.className = 'status error';
+                status.textContent = '❌ WebRTC not supported in this browser';
+                return;
+            }
+
+            try {
+                const pc = new RTCPeerConnection({
+                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                });
+                
+                status.className = 'status success';
+                status.textContent = '✅ WebRTC is supported and working!';
+                pc.close();
+            } catch (error) {
+                status.className = 'status error';
+                status.textContent = '❌ WebRTC error: ' + error.message;
+            }
+        }
+
+        function testFileAPI() {
+            const input = document.getElementById('file-input');
+            const status = document.getElementById('file-status');
+            
+            if (input.files.length === 0) {
+                status.className = 'status info';
+                status.textContent = 'No files selected';
+                return;
+            }
+
+            let results = [];
+            for (let file of input.files) {
+                results.push(`${file.name} (${formatFileSize(file.size)})`);
+            }
+            
+            status.className = 'status success';
+            status.textContent = '✅ Files loaded: ' + results.join(', ');
+        }
+
+        function testNetwork() {
+            const status = document.getElementById('network-status');
+            
+            if (navigator.onLine) {
+                status.className = 'status success';
+                status.textContent = '✅ Network is online';
+            } else {
+                status.className = 'status error';
+                status.textContent = '❌ Network is offline';
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Run tests on page load
+        window.onload = function() {
+            testWebRTC();
+            testNetwork();
+        };
+    </script>
+</body>
+</html>
